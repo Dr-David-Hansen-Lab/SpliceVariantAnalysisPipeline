@@ -20,12 +20,6 @@ Quick Start
     - Edit `config/samples.csv` to list your samples and FASTQ paths.
     - Edit `config/config.yaml` to set the genes you want to analyze (see below).
 
-2. **Prepare your data:**
-    - Place raw FASTQ files in `data/raw/`.
-    - Download reference files (genome.fa, transcripts.fa, reference.gtf) to `data/reference/`.
-    - Edit `config/samples.csv` to list your samples and FASTQ paths.
-    - Edit `config/config.yaml` to set the genes you want to analyze (see below).
-
 3. **Set genes of interest:**
     - Open `config/config.yaml` and edit the `genes_of_interest` list under `r_analysis:`. Example:
       ```yaml
@@ -65,40 +59,3 @@ Outputs
 - `alignments/`: BAM files (if running alignment)
 - `analysis/`: Downstream results, merged GTFs, and logs
 
-For more details on each step, see the comments in the Snakefile and scripts/.
-HISAT2 alignment:
-hisat2 -p 8 --dta -x hisat2_index/GRCh38 \
-    -1 sample_R1.fastq.gz -2 sample_R2.fastq.gz \
-    -S alignments/sampleX.sam
-samtools view -bS sampleX.sam | samtools sort -@4 -o alignments/sampleX.sorted.bam
-samtools index alignments/sampleX.sorted.bam
-StringTie assembly:
-stringtie alignments/sampleX.sorted.bam -p 8 \
-    -G reference.gtf -o stringtie/sampleX.stringtie.gtf -A stringtie/sampleX.gene_abund.tab -e -B
-Merge all sample assemblies:
-ls stringtie/*.gtf > stringtie/mergelist.txt
-stringtie --merge -p 8 -G reference.gtf -o stringtie/merged.stringtie.gtf stringtie/mergelist.txt
-gffcompare -r reference.gtf -o stringtie/gffcompare merged.stringtie.gtf
-Step 4: Analysis
-Python (primary quantification & dominance)
-Read Salmon quant.sf files.
-Compute transcript proportions per gene.
-Identify dominant isoforms per sample and per condition.
-Generate plots (stacked bar charts or proportion plots for MS4A4A and MS4A6A).
-R (optional / DTU analysis)
-Use tximport to import Salmon counts.
-Run DRIMSeq or IsoformSwitchAnalyzeR to detect differential transcript usage.
-Step 5: Validation & Visualization
-Inspect BAMs in IGV for junction support.
-Optional sashimi plots using IGV or ggsashimi.
-Experimental validation of novel isoforms if detected.
-Step 6: Adding New Samples
-Place new FASTQs in data/raw/.
-Update samples.csv.
-Run Salmon quantification and append to existing analysis.
-If novel isoform discovery is required, re-run HISAT2 + StringTie on the new samples or the full cohort.
-Notes
-Default genome: GRCh38 (human).
-Default transcriptome: GENCODE or RefSeq.
-For low-RAM machines (16 GB), use Salmon for quantification; HISAT2 + StringTie is feasible for novel isoforms. STAR requires ~32 GB RAM.
-Maintain reproducibility using scripts in scripts/ and keep config/samples.csv updated.
