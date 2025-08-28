@@ -1,0 +1,8 @@
+name = "rna_seq_pipeline"
+
+[dependencies]
+plotly = "*"
+numpy = "*"
+pandas = "*"
+snakemake = "*"
+biopython = "*"

@@ -1,0 +1,24 @@
+# Pipeline outputs & caches
+.snakemake/
+data/raw/
+data/trimmed/
+data/reference/
+salmon_quant/
+alignments/
+analysis/logs/
+
+# Tool reports
+fastp.html
+fastp.json
+
+# Large intermediates
+*.bam
+*.bai
+*.sam
+*.log
+
+# OS / editor
+__pycache__/
+.DS_Store
+.ipynb_checkpoints/
+.vscode/

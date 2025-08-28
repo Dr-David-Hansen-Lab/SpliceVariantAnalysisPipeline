@@ -1,0 +1,49 @@
+# Pipeline configuration file for SpliceVariantAnalysisPipeline
+# Edit this file to specify paths, resources, and analysis options
+
+# Path to sample sheet (CSV)
+samples_csv: config/samples.csv
+
+# Reference files
+reference:
+  genome_fa: data/reference/genome.fa
+  transcripts_fa: data/reference/transcripts.fa
+  gtf: data/reference/reference.gtf
+
+# Salmon index directory
+salmon_index: data/reference/salmon_index
+
+# HISAT2 index directory
+hisat2_index: data/reference/hisat2_index
+
+# Output directories
+trimmed_dir: data/trimmed
+salmon_quant_dir: salmon_quant
+alignments_dir: alignments
+logs_dir: analysis/logs
+
+# Analysis options
+qc:
+  run_fastqc: true
+  run_trimming: true
+  trimmer: fastp  # or TrimGalore
+
+salmon:
+  kmer_size: 31
+  threads: 8
+
+hisat2:
+  threads: 8
+  dta: true
+
+stringtie:
+  merge: true
+  compare: true
+
+r_analysis:
+  genes_of_interest:
+    - MS4A4A
+    - MS4A6A
+  dtu_method: DRIMSeq  # or IsoformSwitchAnalyzeR
+
+# Add more options as needed

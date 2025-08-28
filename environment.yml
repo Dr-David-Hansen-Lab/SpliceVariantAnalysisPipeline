@@ -1,0 +1,24 @@
+name: splice-isoform-pipeline
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - snakemake
+  - r-base=4.2
+  - r-ggplot2
+  - salmon>=1.0
+  - hisat2
+  - stringtie
+  - samtools
+  - fastqc
+  - multiqc
+  - fastp
+  - pip
+  - pip:
+      - yq

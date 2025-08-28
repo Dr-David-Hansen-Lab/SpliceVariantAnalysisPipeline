@@ -1,0 +1,9 @@
+# Sample sheet for SpliceVariantAnalysisPipeline
+# Columns: sample, condition, fastq_1, fastq_2
+# Example:
+# sample,condition,fastq_1,fastq_2
+# THP1_rep1,THP1,data/raw/THP1_rep1_R1.fastq.gz,data/raw/THP1_rep1_R2.fastq.gz
+# HEK293T_rep1,HEK293T,data/raw/HEK293T_rep1_R1.fastq.gz,data/raw/HEK293T_rep1_R2.fastq.gz
+#
+sample,condition,fastq_1,fastq_2
+MG_001, Microglia, data/raw/SRR6940447_1.fastq.gz, data/raw/SRR6940447_2.fastq.gz
