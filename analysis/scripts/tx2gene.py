@@ -5,6 +5,7 @@ import pandas as pd
 
 # Simple and fast GTF parser for transcript->gene mapping
 # Assumes attributes contain gene_id and transcript_id
+# Deduplicates on the fly using a set/dict to minimize memory and I/O
 
 def parse_attributes(attr: str) -> dict:
     out = {}
@@ -18,7 +19,8 @@ def parse_attributes(attr: str) -> dict:
     return out
 
 def build_tx2gene(gtf_path: str) -> pd.DataFrame:
-    rows = []
+    # Map (transcript_id, gene_id) -> gene_name (prefer explicit gene_name over fallback gene_id)
+    best_name = {}
     with open(gtf_path, 'r') as fh:
         for line in fh:
             if not line or line.startswith('#'):
@@ -26,18 +28,25 @@ def build_tx2gene(gtf_path: str) -> pd.DataFrame:
             parts = line.rstrip('\n').split('\t')
             if len(parts) < 9:
                 continue
-            feature = parts[2]
-            if feature != 'transcript':
-                # Some GTFs annotate transcript info on exon lines as well; collect from any line with transcript_id
-                attrs = parse_attributes(parts[8])
-                if 'transcript_id' in attrs and 'gene_id' in attrs:
-                    rows.append((attrs['transcript_id'], attrs['gene_id'], attrs.get('gene_name', attrs['gene_id'])))
-                continue
             attrs = parse_attributes(parts[8])
-            if 'transcript_id' in attrs and 'gene_id' in attrs:
-                rows.append((attrs['transcript_id'], attrs['gene_id'], attrs.get('gene_name', attrs['gene_id'])))
-    # Deduplicate
-    df = pd.DataFrame(rows, columns=['transcript_id', 'gene_id', 'gene_name']).drop_duplicates()
+            if 'transcript_id' not in attrs or 'gene_id' not in attrs:
+                continue
+            tx = attrs['transcript_id']
+            gid = attrs['gene_id']
+            gname = attrs.get('gene_name', gid)
+            key = (tx, gid)
+            # Insert once; upgrade to non-default gene_name if encountered later
+            if key not in best_name:
+                best_name[key] = gname
+            else:
+                if best_name[key] == gid and gname != gid:
+                    best_name[key] = gname
+    if not best_name:
+        return pd.DataFrame(columns=['transcript_id', 'gene_id', 'gene_name'])
+    rows = [(tx, gid, best_name[(tx, gid)]) for (tx, gid) in best_name.keys()]
+    # Sort for reproducibility
+    rows.sort(key=lambda x: (x[1], x[0]))  # by gene_id then transcript_id
+    df = pd.DataFrame(rows, columns=['transcript_id', 'gene_id', 'gene_name'])
     return df
 
 
