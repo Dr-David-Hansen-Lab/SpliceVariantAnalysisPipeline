@@ -15,6 +15,7 @@ dependencies:
   - salmon>=1.0
   - hisat2
   - stringtie
+  - gffcompare
   - samtools
   - fastqc
   - multiqc

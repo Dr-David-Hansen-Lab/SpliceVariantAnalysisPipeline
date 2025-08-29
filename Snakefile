@@ -17,6 +17,7 @@ ALIGNMENTS_DIR = config["alignments_dir"]
 LOGS_DIR = config["logs_dir"]
 HISAT2_INDEX_DIR = config["hisat2_index"]
 SALMON_INDEX_DIR = config["salmon_index"]
+ANALYSIS_DIR = config.get("analysis_dir", "output/analysis")
 
 # Load sample sheet once and reuse mappings
 def _read_samples_df():
@@ -46,8 +47,14 @@ rule all:
 		expand(f"{TRIMMED_DIR}/{{sample}}_R2.trimmed.fastq.gz", sample=SAMPLES),
 		expand(f"{SALMON_QUANT_DIR}/{{sample}}/quant.sf", sample=SAMPLES),
 		expand(f"{ALIGNMENTS_DIR}/{{sample}}.sorted.bam", sample=SAMPLES),
-		"analysis/merged.stringtie.gtf",
-		"analysis/logs/pipeline_complete.txt"
+		f"{ANALYSIS_DIR}/merged.stringtie.gtf",
+		f"{ANALYSIS_DIR}/tx2gene.tsv",
+		expand(f"{ANALYSIS_DIR}/isoforms/{{sample}}_proportions.csv", sample=SAMPLES),
+		expand(f"{ANALYSIS_DIR}/isoforms/{{sample}}_dominant.csv", sample=SAMPLES),
+		expand(f"{ANALYSIS_DIR}/figures/{{gene}}_proportions.png", gene=config["r_analysis"]["genes_of_interest"]),
+		expand(f"{ANALYSIS_DIR}/gene_tables/{{gene}}_isoforms.csv", gene=config["r_analysis"]["genes_of_interest"]),
+		f"{ANALYSIS_DIR}/report/isoform_report.md",
+		f"{LOGS_DIR}/pipeline_complete.txt"
 
 rule download_reference:
 	output:
@@ -134,40 +141,92 @@ rule stringtie_assemble:
 	input:
 		bam=f"{ALIGNMENTS_DIR}/{{sample}}.sorted.bam"
 	output:
-		gtf="analysis/{sample}.stringtie.gtf",
-		log="analysis/{sample}_stringtie.log"
+		gtf=f"{ANALYSIS_DIR}/{{sample}}.stringtie.gtf",
+		log=f"{ANALYSIS_DIR}/{{sample}}_stringtie.log"
 	params:
 		gtf=config["reference"]["gtf"]
 	shell:
-		"stringtie {input.bam} -G {params.gtf} -o {output.gtf} > {output.log} 2>&1"
+		"mkdir -p $(dirname {output.gtf}) && stringtie {input.bam} -G {params.gtf} -o {output.gtf} > {output.log} 2>&1"
 
 rule stringtie_merge:
 	input:
-		gtfs=expand("analysis/{sample}.stringtie.gtf", sample=SAMPLES)
+		gtfs=expand(f"{ANALYSIS_DIR}/{{sample}}.stringtie.gtf", sample=SAMPLES)
 	output:
-		merged="analysis/merged.stringtie.gtf",
-		log="analysis/merged_stringtie_merge.log"
+		merged=f"{ANALYSIS_DIR}/merged.stringtie.gtf",
+		log=f"{ANALYSIS_DIR}/merged_stringtie_merge.log"
 	params:
 		gtf=config["reference"]["gtf"]
 	shell:
-		"stringtie --merge -G {params.gtf} -o {output.merged} {input.gtfs} > {output.log} 2>&1"
+		"mkdir -p $(dirname {output.merged}) && stringtie --merge -G {params.gtf} -o {output.merged} {input.gtfs} > {output.log} 2>&1"
 
 rule gffcompare:
 	input:
-		merged="analysis/merged.stringtie.gtf"
+		merged=f"{ANALYSIS_DIR}/merged.stringtie.gtf"
 	output:
-		cmp="analysis/merged.stringtie.gtf.tmap",
-		log="analysis/merged_gffcompare.log"
+		cmp=f"{ANALYSIS_DIR}/merged.merged.stringtie.gtf.tmap",
+		log=f"{ANALYSIS_DIR}/merged_gffcompare.log"
 	params:
 		gtf=config["reference"]["gtf"]
 	shell:
-		"gffcompare -r {params.gtf} -o analysis/merged {input.merged} > {output.log} 2>&1"
+		"mkdir -p {ANALYSIS_DIR} && gffcompare -r {params.gtf} -o {ANALYSIS_DIR}/merged {input.merged} > {output.log} 2>&1"
 
 rule pipeline_complete:
 	input:
-		"analysis/merged.stringtie.gtf.tmap"
+		f"{ANALYSIS_DIR}/merged.merged.stringtie.gtf.tmap"
 	output:
-		touch("analysis/logs/pipeline_complete.txt")
+		touch(f"{LOGS_DIR}/pipeline_complete.txt")
 	shell:
-		"echo 'Pipeline completed successfully.' > {output}"
+		"mkdir -p $(dirname {output}) && echo 'Pipeline completed successfully.' > {output}"
+
+# Build transcript->gene mapping from reference GTF
+rule tx2gene_map:
+	input:
+		gtf=config["reference"]["gtf"]
+	output:
+		f"{ANALYSIS_DIR}/tx2gene.tsv"
+	shell:
+		"mkdir -p $(dirname {output}) && python analysis/scripts/tx2gene.py --gtf {input.gtf} --out {output}"
+
+# Compute isoform proportions and dominant isoforms per sample from Salmon quant + tx2gene map
+rule isoform_tables:
+	input:
+		quant=f"{SALMON_QUANT_DIR}/{{sample}}/quant.sf",
+		tx2gene=f"{ANALYSIS_DIR}/tx2gene.tsv"
+	output:
+		props=f"{ANALYSIS_DIR}/isoforms/{{sample}}_proportions.csv",
+		dom=f"{ANALYSIS_DIR}/isoforms/{{sample}}_dominant.csv"
+	shell:
+		"python analysis/scripts/compute_isoform_tables.py --quant {input.quant} --tx2gene {input.tx2gene} --props {output.props} --dominant {output.dom}"
+
+# Generate figures for genes of interest across samples
+rule isoform_figures:
+	input:
+		props=expand(f"{ANALYSIS_DIR}/isoforms/{{sample}}_proportions.csv", sample=SAMPLES)
+	output:
+		expand(f"{ANALYSIS_DIR}/figures/{{gene}}_proportions.png", gene=config["r_analysis"]["genes_of_interest"])
+	params: 
+		genes_str=(" ".join(config["r_analysis"]["genes_of_interest"]) if isinstance(config["r_analysis"]["genes_of_interest"], list) else str(config["r_analysis"]["genes_of_interest"])),
+		metric=str(config.get('plots', {}).get('figure_metric', 'proportion'))
+	shell:
+		"python analysis/scripts/plot_isoform_figures.py --props_dir {ANALYSIS_DIR}/isoforms --genes {params.genes_str} --out_dir {ANALYSIS_DIR}/figures --metric {params.metric}"
+
+# Export gene-specific isoform tables across samples
+rule gene_isoform_tables:
+	input:
+		props=expand(f"{ANALYSIS_DIR}/isoforms/{{sample}}_proportions.csv", sample=SAMPLES)
+	output:
+		expand(f"{ANALYSIS_DIR}/gene_tables/{{gene}}_isoforms.csv", gene=config["r_analysis"]["genes_of_interest"])
+	params:
+		genes_str=(" ".join(config["r_analysis"]["genes_of_interest"]) if isinstance(config["r_analysis"]["genes_of_interest"], list) else str(config["r_analysis"]["genes_of_interest"]))
+	shell:
+		"python analysis/scripts/export_gene_isoforms.py --props_dir {ANALYSIS_DIR}/isoforms --genes {params.genes_str} --out_dir {ANALYSIS_DIR}/gene_tables"
+
+# Create a simple Markdown report linking figures
+rule isoform_report:
+	input:
+		figs=expand(f"{ANALYSIS_DIR}/figures/{{gene}}_proportions.png", gene=config["r_analysis"]["genes_of_interest"])
+	output:
+		f"{ANALYSIS_DIR}/report/isoform_report.md"
+	shell:
+		"python analysis/scripts/write_report.py --figs {input.figs} --out {output}"
 

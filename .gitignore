@@ -1,11 +1,17 @@
 # Pipeline outputs & caches
 .snakemake/
-data/raw/
+data/raw/*.fastq.gz
+data/raw/*.fastq
 data/trimmed/
 data/reference/
 salmon_quant/
 alignments/
 analysis/logs/
+merged.*
+*.stringtie.gtf
+tx2gene.tsv
+*.trimmed.fastq.gz
+/output
 
 # Tool reports
 fastp.html
@@ -22,3 +28,4 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 .vscode/
+.pytest_cache

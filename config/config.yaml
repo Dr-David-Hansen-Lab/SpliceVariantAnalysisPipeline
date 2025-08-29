@@ -16,11 +16,12 @@ salmon_index: data/reference/salmon_index
 # HISAT2 index directory
 hisat2_index: data/reference/hisat2_index
 
-# Output directories
-trimmed_dir: data/trimmed
-salmon_quant_dir: salmon_quant
-alignments_dir: alignments
-logs_dir: analysis/logs
+# Output directories (organized under output/)
+analysis_dir: output/analysis
+trimmed_dir: output/trimmed
+salmon_quant_dir: output/salmon_quant
+alignments_dir: output/alignments
+logs_dir: output/logs
 
 # Analysis options
 qc:
@@ -45,5 +46,10 @@ r_analysis:
     - MS4A4A
     - MS4A6A
   dtu_method: DRIMSeq  # or IsoformSwitchAnalyzeR
+
+# Plotting options
+plots:
+  # 'proportion' or 'NumReads'
+  figure_metric: NumReads
 
 # Add more options as needed
